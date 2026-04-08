@@ -1,0 +1,206 @@
+const { Router } = require('express')
+const path = require('path');
+const multer = require('multer');
+
+const BlogRouter = Router();
+
+const mysqlconnection = require('../dstsbase/database.js');
+
+BlogRouter.get('/', (req, res) => {
+  res.status(200).json('server on port 8000 and database is connected');
+});
+
+BlogRouter.get('/all', (req, res) => {
+  mysqlconnection.query('select id,title,short_description, blog,is_published,created_at from blog', (error, rows, fields) => {
+    if (!error) {
+      res.json(rows);
+    } else {
+      console.log(error);
+    }
+  });
+});
+
+BlogRouter.get("/all/:id", (req, res) => {
+  const blogid = req.params.id;
+  const query = "select id,title, blog,created_at from blog where id=?";
+  mysqlconnection.query(query, [blogid], (error, rows, fields) => {
+    if (!error) {
+      res.json(rows);
+    } else {
+      console.log(error);
+    }
+  });
+});
+
+BlogRouter.get("/allNew/:id", (req, res) => {
+  const blogid = req.params.id;
+  const query = "select id,title,short_description, blog,is_published,created_at from blog where id=?";
+  mysqlconnection.query(query, [blogid], (error, rows, fields) => {
+    if (!error) {
+      res.json(rows);
+    } else {
+      console.log(error);
+    }
+  });
+});
+
+BlogRouter.get("/image/:id", (req, res) => {
+  const imageId = req.params.id;
+  const query = "SELECT image FROM blog WHERE id=?";
+
+  mysqlconnection.query(query, [imageId], (err, result) => {
+    if (err) {
+      return res.status(500).send("Error fetching image");
+    }
+    if (result.length === 0) {
+      return res.status(404).send("Image not found");
+    }
+
+    res.contentType("image/jpeg");
+    res.send(result[0].image); // Send the image buffer back as a response
+  });
+});
+
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
+
+BlogRouter.post("/add", upload.single("image"), (req, res) => {
+  const { title, blog } = req.body;
+  const imageBuffer = req.file.buffer;
+  const query = "INSERT INTO blog (title, blog, image) VALUES (?,?,?)";
+
+  mysqlconnection.query(query, [title, blog, imageBuffer], (err, result) => {
+    if (err) {
+      return res.status(500).send("Error saving image to database");
+    }
+    res.status(200).send("Image uploaded successfully");
+  });
+});
+
+//for new typescript dashboard
+BlogRouter.post("/add_New", upload.single("image"), (req, res) => {
+  const { title, short_description, blog, is_published, created_at } = req.body;
+  const imageBuffer = req.file?.buffer;
+
+  if (!title || !short_description || !blog) {
+    return res.status(400).json({
+      status: "error",
+      message: "title, short_description, and blog are required",
+      reqBody: req.body,
+    });
+  }
+
+  const query = "INSERT INTO blog (title, short_description, blog, image, is_published,created_at) VALUES (?,?,?,?,?,?)";
+  const values = [title, short_description, blog, imageBuffer || null, is_published ?? 0, created_at];
+
+  mysqlconnection.query(query, values, (err, result) => {
+    if (err) {
+      console.error("❌ MySQL insert error:", err);
+      return res.status(500).json({
+        status: "error",
+        message: "Failed to save blog",
+        error: err.message,
+        reqBody: req.body,
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "Blog created successfully",
+      id: result.insertId,
+      reqBody: req.body,
+    });
+  });
+});
+
+BlogRouter.put("/update/:id", upload.single("image"), (req, res) => {
+  const id = req.params.id;
+  const { title, blog } = req.body;
+
+  const imageBuffer = req.file?.buffer;
+
+  // Build dynamic SQL
+  let query = `
+    UPDATE blog 
+    SET title =?, blog =?
+  `;
+  const values = [title, blog];
+
+  // Only update image if a new one is uploaded
+  if (imageBuffer) {
+    query += `, image = ?`;
+    values.push(imageBuffer);
+  }
+
+  query += ` WHERE id = ?`;
+  values.push(id);
+
+  mysqlconnection.query(query, values, (err, result) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).send("Error updating the blog");
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).send("blog not found");
+    }
+
+    res.status(200).send("blog updated successfully");
+  });
+});
+
+// for new typescript dashboard
+BlogRouter.put("/updateNew/:id", upload.single("image"), (req, res) => {
+  const id = req.params.id;
+  let { title, short_description, blog, is_published } = req.body;
+
+  is_published = (is_published === true || is_published === 'true' || is_published === 1 || is_published === '1') ? 1 : 0;
+
+  const imageBuffer = req.file?.buffer;
+
+  // Build dynamic SQL
+  let query = `
+    UPDATE blog 
+    SET title =?,short_description=?, blog =?, is_published=?
+  `;
+  const values = [title, short_description, blog, is_published];
+
+  // Only update image if a new one is uploaded
+  if (imageBuffer) {
+    query += `, image = ?`;
+    values.push(imageBuffer);
+  }
+
+  query += ` WHERE id = ?`;
+  values.push(id);
+
+  mysqlconnection.query(query, values, (err, result) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Error updating the blog", details: err });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Blog not found" });
+    }
+
+    // Return updated blog ID
+    res.status(200).json({ id, message: "Blog updated successfully" });
+  });
+});
+
+
+BlogRouter.post('/delete', (req, res) => {
+  const { id } = req.body;
+  console.log(req.body);
+  mysqlconnection.query('delete from blog where id=?'
+    , [id], (error, rows, fields) => {
+      if (!error) {
+        res.json(rows);
+      } else {
+        res.json({ status: error });
+      }
+    });
+});
+
+module.exports = BlogRouter;
