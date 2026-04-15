@@ -39,7 +39,7 @@ const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
 
 ChatRouter.post('/upload', upload.single('file'), (req, res) => {
-  const fileUrl = `https://back-end-for-gurihage.onrender.com/uploads/${req.file.filename}`;
+  const fileUrl = `https://gurihage.com/uploads/${req.file.filename}`;
   res.json({ file_url: fileUrl });
 });
 
