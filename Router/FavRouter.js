@@ -36,6 +36,28 @@ FavourRouter.get('/all', (req, res) => {
 
 });
 
+FavourRouter.get('/all/:id', (req, res) => {
+  const propertiesid = req.params.id;
+
+  const query = `
+    SELECT 
+      f.property_id
+    FROM favourite f
+    INNER JOIN properties p ON f.property_id = p.id
+    WHERE f.id = ?
+  `;
+
+  mysqlconnection.query(query, [propertiesid], (error, rows) => {
+    if (!error) {
+      res.json(rows);
+    } else {
+      console.log(error);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
+});
+
 FavourRouter.post('/add', (req, res) => {
   const { property_id, user_id, created_at } = req.body;
   console.log(req.body);

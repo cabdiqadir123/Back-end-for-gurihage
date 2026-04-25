@@ -90,7 +90,7 @@ UserRouter.get("/userrole/all/:id", (req, res) => {
 
 UserRouter.get("/customer/profile_image/:id", (req, res) => {
   const profile_imageId = req.params.id;
-  const query = 'SELECT profile_image FROM users WHERE id = ? and role="customer"';
+  const query = 'SELECT profile_image FROM users WHERE id = ?';
 
   mysqlconnection.query(query, [profile_imageId], (err, result) => {
     if (err) {
@@ -107,17 +107,20 @@ UserRouter.get("/customer/profile_image/:id", (req, res) => {
 
 UserRouter.get("/profile_image/:id", (req, res) => {
   const profile_imageId = req.params.id;
+
   const query = 'SELECT profile_image FROM users WHERE id = ?';
 
   mysqlconnection.query(query, [profile_imageId], (err, result) => {
     if (err) {
-      return res.status(500).send("Error fetching profile_image");
+      return res.status(500).send("Error fetching profile image");
     }
-    if (result.length === 0) {
-      return res.status(404).send("profile_image not found");
+
+    if (result.length === 0 || !result[0].profile_image) {
+      return res.status(404).send("No image");
     }
-    res.contentType("profile_image/jpeg");
-    res.send(result[0].profile_image); // Send the profile_image buffer back as a response
+
+    res.set("Content-Type", "image/jpeg"); // ✅ FIXED
+    res.send(result[0].profile_image);
   });
 });
 
@@ -206,7 +209,7 @@ UserRouter.put("/update/:id", upload.single("profile_image"), (req, res) => {
   // ✅ Only update profile_image if provided
   if (imageBuffer) {
     query += `, profile_image = ?`;
-    values.push(profile_imageBuffer);
+    values.push(imageBuffer);
   }
 
   query += ` WHERE id = ?`;

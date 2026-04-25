@@ -16,7 +16,7 @@ app.use('/api/user/', require('./Router/UserRouter'));
 app.use('/api/Complaint/', require('./Router/ComplaintRouter'));
 // app.use('/api/notification/', require('./Router/NotificationRouter'));
 app.use('/api/booking/', require('./Router/BookingRouter'));
-app.use('/api/send/', require('./Router/SendRouter'));
+// app.use('/api/send/', require('./Router/SendRouter'));
 app.use('/api/favour/', require('./Router/FavRouter'));
 // app.use('/api/evc-pay/', require('./Router/EvcRouter'));
 // app.use('/api/contact/', require('./Router/ContactRouter'));
@@ -34,6 +34,8 @@ app.use('/api/complaint/', require('./Router/ComplaintRouter.js'));
 app.use('/api/maintenance/', require('./Router/MaintenanceRouter.js'));
 app.use('/api/payment/', require('./Router/PaymentRouter.js'));
 app.use('/uploads', express.static('uploads'));
+app.use('/api/agora/', require('./Router/CallRouter.js'));
+app.use('/api/property_images/', require('./Router/PropertyImagesRouter.js'));
 
 // ------------------- HEARTBEAT -------------------
 // const APP_URL = `http://192.168.220.1:${app.get('port')}`;
@@ -52,7 +54,7 @@ function isSomaliaActiveTime() {
 
 //   try {
 //     const res = await fetch(APP_URL + MAIN_ROUTE);
-//     console.log(`Pinged ${MAIN_ROUTE} → Status: ${res.status}`);
+//     console.log(`Pinged ${MAIN_ROUTE} â†’ Status: ${res.status}`);
 //   } catch (err) {
 //     console.error(`Ping failed:`, err.message);
 //   }
@@ -79,19 +81,24 @@ global.onlineUsers = onlineUsers;
 // ------------------- SOCKET EVENTS -------------------
 
 io.on("connection", (socket) => {
-  console.log("🟢 User connected:", socket.id);
+  console.log("ðŸŸ¢ User connected:", socket.id);
 
   // REGISTER USER
   socket.on("join", (user_id) => {
     onlineUsers.set(user_id, socket.id);
-    console.log(`👤 User ${user_id} registered with socket ${socket.id}`);
+    console.log(`ðŸ‘¤ User ${user_id} registered with socket ${socket.id}`);
   });
 
   // ----------------------------------------------------
-  // 🔥 CHAT SYSTEM
+  // ðŸ”¥ CHAT SYSTEM
   // ----------------------------------------------------
   socket.on("send_message", (data) => {
-    const { sender_id, receiver_id, message, type, file_url, duration } = data;
+    let { sender_id, receiver_id, message, type, file_url, duration, client_temp_id } = data;
+
+    // ? FIX HERE
+    message = message ?? "";      // if null/undefined ? ""
+    file_url = file_url ?? "";    // optional (if column NOT NULL)
+    duration = duration ?? "";    // optional (if column NOT NULL)
 
     mysqlconnection.query(
       `INSERT INTO messages 
@@ -109,7 +116,8 @@ io.on("connection", (socket) => {
           type,
           file_url,
           duration,
-          created_at: new Date()
+          created_at: new Date(),
+          client_temp_id // ? RETURN BACK
         };
 
         const receiverSocket = onlineUsers.get(receiver_id);
@@ -118,17 +126,16 @@ io.on("connection", (socket) => {
           io.to(receiverSocket).emit("receive_message", newMessage);
         }
 
-        // send back to sender also (VERY IMPORTANT)
         socket.emit("receive_message", newMessage);
       }
     );
   });
 
   // ----------------------------------------------------
-  // 🔥 CALL SYSTEM (AGORA)
+  // ðŸ”¥ CALL SYSTEM (AGORA)
   // ----------------------------------------------------
 
-  // Client → Worker call request
+  // Client â†’ Worker call request
   socket.on("call_user", (data) => {
     const receiverSocket = global.onlineUsers.get(data.receiverId);
 
@@ -137,16 +144,21 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Receiver → accepts
+  // Receiver â†’ accepts
   socket.on("call_accepted", (data) => {
     const callerSocket = global.onlineUsers.get(data.callerId);
 
     if (callerSocket) {
-      io.to(callerSocket).emit("call_accepted", data);
+      io.to(callerSocket).emit("call_accepted", {
+        callerId: data.callerId,
+        channel: data.channel,
+        token: data.token,
+        uid: data.uid,
+      });
     }
   });
 
-  // Receiver → rejects
+  // Receiver â†’ rejects
   socket.on("call_rejected", (data) => {
     const callerSocket = global.onlineUsers.get(data.callerId);
 
@@ -176,9 +188,9 @@ io.on("connection", (socket) => {
 
 // ------------------- START SERVER -------------------
 server.listen(app.get("port"), '0.0.0.0', () => {
-  console.log(`🚀 Server running with Socket.IO on port ${app.get("port")}`);
+  console.log(`Server running with Socket.IO on port ${app.get("port")}`);
 });
 
 // server.listen(app.get("port"), () => {
-//   console.log(`🚀 Server running with Socket.IO on port ${app.get("port")}`);
+//   console.log(`ðŸš€ Server running with Socket.IO on port ${app.get("port")}`);
 // });

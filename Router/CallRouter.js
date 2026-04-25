@@ -31,38 +31,6 @@ CallRouter.post("/create", (req, res) => {
         expire
     );
 
-    // 3. Save to DB (optional)
-    mysql.query(
-        `INSERT INTO calls (caller_id, receiver_id, channel, status) VALUES (?, ?, ?, 'ringing')`,
-        [caller_id, receiver_id, channel],
-        (err, result) => {
-            if (err) return res.json({ error: "DB error" });
-
-            const call_id = result.insertId;
-
-            // 4. Notify receiver if online
-            const receiverSocket = global.onlineUsers.get(receiver_id);
-
-            if (receiverSocket) {
-                global.io.to(receiverSocket).emit("incoming_call", {
-                    call_id,
-                    callerId: caller_id,
-                    receiverId: receiver_id,
-                    channelName: channel,
-                    token,
-                    agoraAppId: APP_ID
-                });
-            }
-
-            return res.json({
-                success: true,
-                call_id,
-                channel,
-                token,
-                agoraAppId: APP_ID
-            });
-        }
-    );
 });
 
 module.exports = CallRouter;
