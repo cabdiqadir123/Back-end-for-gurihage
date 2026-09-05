@@ -19,6 +19,19 @@ RegionRouter.get('/all', (req, res) => {
         });
 });
 
+RegionRouter.get('/all/:id', (req, res) => {
+    const id = req.params.id;
+    mysqlconnection.query('select * from regions where id =?', [id],
+        (error, rows, fields) => {
+            if (!error) {
+                res.json(rows);
+            } else {
+                console.log(error);
+            }
+        });
+});
+
+
 RegionRouter.post('/add', (req, res) => {
     const {
         name,

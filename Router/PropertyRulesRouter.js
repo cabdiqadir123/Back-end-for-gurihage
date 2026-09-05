@@ -21,19 +21,19 @@ PropertyRulesRouter.get('/all', (req, res) => {
 
 PropertyRulesRouter.post('/add', (req, res) => {
     const {
-        unit_code,
+        pr_code,
         name,
         created_at
     } = req.body;
 
     const sql = `
-    INSERT INTO property_rules (unit_code,name, created_at)
+    INSERT INTO property_rules (pr_code,name, created_at)
     VALUES (?,?,?)
   `;
 
     mysqlconnection.query(
         sql,
-        [unit_code,name, created_at],
+        [pr_code,name, created_at],
         (error, results) => {
             if (error) {
                 console.error("❌ MySQL Insert Error:", error);
@@ -62,7 +62,7 @@ PropertyRulesRouter.post('/add', (req, res) => {
 
 PropertyRulesRouter.put('/update/:id', (req, res) => {
     const id = req.params.id;
-    const { unit_code,name } = req.body;
+    const { pr_code,name } = req.body;
 
     // Automatically use current timestamp if last_updated is not provided
     const currentTime = new Date();
@@ -70,12 +70,12 @@ PropertyRulesRouter.put('/update/:id', (req, res) => {
     const query = `
     UPDATE property_rules
     SET 
-      unit_code=?,name=?
+      pr_code=?,name=?
     WHERE id = ?;
   `;
 
     const values = [
-        unit_code,name,
+        pr_code,name,
         id
     ];
 

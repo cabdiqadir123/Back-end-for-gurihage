@@ -11,37 +11,60 @@ MaintenanceRouter.get('/', (req, res) => {
 MaintenanceRouter.get('/all', (req, res) => {
 
   const query = `
-    SELECT 
-      m.id,
-      m.category,
-      m.title,
-      m.description,
-      m.status,
-      m.urgency_level,
-      m.repair_time,
-      m.created_at,
+    SELECT
+          m.id,
+          m.unit_id,
+          m.category,
+          m.title,
+          m.description,
+          m.status,
+          m.urgency_level,
+          m.repair_time,
+          m.created_at,
 
-      -- Tenant
-      t.id AS tenant_id,
-      t.full_name AS tenant_name,
-      t.phone AS tenant_phone,
-      t.address AS tenant_address,
+          -- Tenant
+          t.id AS tenant_id,
+          t.full_name AS tenant_name,
+          t.phone AS tenant_phone,
+          t.address AS tenant_address,
 
-      -- Property
-      p.id AS property_id,
-      p.name AS property_name,
-      p.address AS property_address,
+          -- Property
+          p.id AS property_id,
 
-      -- Owner
-      o.id AS owner_id,
-      o.full_name AS owner_name,
-      o.phone AS owner_phone
+          CASE
+              WHEN p.property_type = 'apartment'
+              THEN CONCAT(
+                  p.name,
+                  ' - Floor ',
+                  fl.floor_num,
+                  ' - Unit ',
+                  unit.unit_code
+              )
+              ELSE p.name
+          END AS property_name,
+          p.address AS property_address,
 
-    FROM maintenance m
+          -- Owner
+          o.id AS owner_id,
+          o.full_name AS owner_name,
+          o.phone AS owner_phone
 
-    LEFT JOIN users t ON m.tenant_id = t.id
-    LEFT JOIN properties p ON m.property_id = p.id
-    LEFT JOIN users o ON p.owner_id = o.id
+      FROM maintenance m
+
+      LEFT JOIN users t
+          ON m.tenant_id = t.id
+
+      LEFT JOIN properties p
+          ON m.property_id = p.id
+
+      LEFT JOIN unit unit
+          ON m.unit_id = unit.id
+
+      LEFT JOIN floor fl
+          ON unit.floor = fl.id
+
+      LEFT JOIN users o
+          ON p.owner_id = o.id;
   `;
 
   mysqlconnection.query(query, (error, rows) => {
@@ -55,16 +78,95 @@ MaintenanceRouter.get('/all', (req, res) => {
 
 });
 
+MaintenanceRouter.get('/user/:id', (req, res) => {
+  const id = req.params.id;
+  const query = `
+    SELECT
+          m.id,
+          m.unit_id,
+          m.category,
+          m.title,
+          m.description,
+          m.status,
+          m.urgency_level,
+          m.repair_time,
+          m.created_at,
+
+          -- Tenant
+          t.id AS tenant_id,
+          t.full_name AS tenant_name,
+          t.phone AS tenant_phone,
+          t.address AS tenant_address,
+
+          -- Property
+          p.id AS property_id,
+
+          CASE
+              WHEN p.property_type = 'apartment'
+              THEN CONCAT(
+                  p.name,
+                  ' - Floor ',
+                  fl.floor_num,
+                  ' - Unit ',
+                  unit.unit_code
+              )
+              ELSE p.name
+          END AS property_name,
+          p.address AS property_address,
+
+          -- Owner
+          o.id AS owner_id,
+          o.full_name AS owner_name,
+          o.phone AS owner_phone
+
+      FROM maintenance m
+
+      LEFT JOIN users t
+          ON m.tenant_id = t.id
+
+      LEFT JOIN properties p
+          ON m.property_id = p.id
+
+      LEFT JOIN unit unit
+          ON m.unit_id = unit.id
+
+      LEFT JOIN floor fl
+          ON unit.floor = fl.id
+
+      LEFT JOIN users o
+          ON p.owner_id = o.id
+          where t.id =?
+  `;
+
+  mysqlconnection.query(query,[id], (error, rows) => {
+    if (!error) {
+      res.json(rows);
+    } else {
+      console.log(error);
+      res.status(500).json({ error: "Database error" });
+    }
+  });
+
+});
+
 MaintenanceRouter.post('/add', (req, res) => {
-  const { tenant_id, property_id, category, title, description, status, urgency_level,repair_time, created_at } = req.body;
+  const { tenant_id, property_id, unit_id, category, title, description, status, urgency_level, repair_time, created_at } = req.body;
   console.log(req.body);
-  mysqlconnection.query('insert into maintenance(tenant_id , property_id , category ,title,description, status   ,urgency_level ,repair_time, created_at) values(?,?,?,?,?,?,?,?,?);',
-    [tenant_id, property_id, category, title, description, status, urgency_level,repair_time, created_at], (error, rows, fields) => {
-      if (!error) {
-        res.json({ status: 'inserted' });
-      } else {
+  mysqlconnection.query('insert into maintenance(tenant_id , property_id,unit_id , category ,title,description, status   ,urgency_level ,repair_time, created_at) values(?,?,?,?,?,?,?,?,?,?);',
+    [tenant_id, property_id,unit_id, category, title, description, status, urgency_level, repair_time, created_at], (error, rows, fields) => {
+      if (error) {
+
         console.log(error);
+
+        return res.status(500).json({
+          message: error.message,
+          sqlError: error
+        });
       }
+      return res.status(200).json({
+        success: true,
+        message: "inserted successfully",
+      });
     });
 });
 
@@ -78,7 +180,38 @@ MaintenanceRouter.put('/update/:id', (req, res) => {
     WHERE id = ?;
   `;
 
-  mysqlconnection.query(query, [status,  id], (error, result) => {
+  mysqlconnection.query(query, [status, id], (error, result) => {
+    if (error) {
+      console.error('Error updating maintenance:', error);
+      return res.status(500).json({
+        error: 'Failed to update maintenance',
+        details: error.message,
+        body: req.body
+      });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'maintenance not found' });
+    }
+
+    res.status(200).json({
+      message: 'maintenance updated successfully',
+      id: id
+    });
+  });
+});
+
+MaintenanceRouter.put('/updateNew/:id', (req, res) => {
+  const id = req.params.id;
+  const { tenant_id, property_id, category, title, description, status, urgency_level, repair_time } = req.body;
+
+  const query = `
+    UPDATE maintenance 
+    SET tenant_id = ? ,property_id = ?,category = ?,title = ?,description = ?, status = ?, urgency_level = ?, repair_time=?
+    WHERE id = ?;
+  `;
+
+  mysqlconnection.query(query, [tenant_id, property_id, category, title, description, status, urgency_level, repair_time, id], (error, result) => {
     if (error) {
       console.error('Error updating maintenance:', error);
       return res.status(500).json({

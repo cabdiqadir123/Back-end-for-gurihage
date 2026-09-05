@@ -15,8 +15,7 @@ DocumentRouter.get('/all', (req, res) => {
   const query = `
     SELECT
       d.id,
-      d.tenant_id,
-      d.book_id,
+      d.user_id,
       d.file_type,
       d.status,
       d.created_at,
@@ -50,8 +49,7 @@ DocumentRouter.get("/all/:id", (req, res) => {
   const query = `
     SELECT
       d.id,
-      d.tenant_id,
-      d.book_id,
+      d.user_id,
       d.file_type,
       d.status,
       d.created_at,
@@ -75,24 +73,28 @@ DocumentRouter.get("/all/:id", (req, res) => {
 
 });
 
-DocumentRouter.get("/allNew/:id", (req, res) => {
+DocumentRouter.get("/allNew", (req, res) => {
   const doc_id = req.params.id;
 
   const query = `
     SELECT
-      d.id,
-      d.tenant_id,
-      d.book_id,
-      d.file_type,
-      d.status,
-      d.created_at,
-
-      u.full_name AS tenant_name,
-      u.phone AS tenant_phone,
-      u.email AS tenant_email
-
-    FROM documents d
-    LEFT JOIN users u ON d.tenant_id = u.id where u.id=?
+          d.id,
+          d.user_id,
+          d.file_type,
+          d.status,
+          d.created_at,
+          u.full_name AS tenant_name,
+          u.phone AS tenant_phone,
+          u.email AS tenant_email,
+          b.property_id,
+          p.name AS property_name
+      FROM documents d
+      LEFT JOIN users u
+      ON d.tenant_id = u.id
+      LEFT JOIN bookings b
+      ON d.book_id = b.id
+      LEFT JOIN properties p
+      ON b.property_id = p.id;
   `;
 
   mysqlconnection.query(query, [doc_id], (error, rows) => {
@@ -105,7 +107,6 @@ DocumentRouter.get("/allNew/:id", (req, res) => {
   });
 
 });
-
 DocumentRouter.get("/image/:id", (req, res) => {
   const imageId = req.params.id;
   const query = "SELECT file FROM documents WHERE id=?";
@@ -126,29 +127,44 @@ DocumentRouter.get("/image/:id", (req, res) => {
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-DocumentRouter.post("/add", upload.single("file"), (req, res) => {
-  const { tenant_id, book_id, file_type, status, created_at } = req.body;
-  const imageBuffer = req.file.buffer;
-  const query = "INSERT INTO documents (tenant_id ,book_id  ,file , file_type ,status ,created_at) VALUES (?,?,?,?,?,?)";
 
-  mysqlconnection.query(query, [tenant_id, book_id, imageBuffer, file_type, status, created_at], (err, result) => {
+DocumentRouter.post("/add", upload.single("file"), (req, res) => {
+  // Fix 1: Check if a file was actually uploaded to prevent app crash
+  if (!req.file) {
+    return res.status(400).json({ message: "No file uploaded under key 'file'" });
+  }
+
+  const { user_id, file_type, status, created_at } = req.body;
+  const imageBuffer = req.file.buffer;
+  
+  const query = "INSERT INTO documents (user_id, file, file_type, status, created_at) VALUES (?,?,?,?,?)";
+
+  mysqlconnection.query(query, [user_id, imageBuffer, file_type, status, created_at], (err, result) => {
     if (err) {
       return res.status(500).json({
         message: "Error saving image to database",
         error: err
       });
     }
-    res.status(200).send("Image uploaded successfully");
+
+    // Fix 2: Use `result` (matches callback param), NOT `results`
+    const insertedId = result.insertId;
+
+    res.status(200).json({
+      message: "Document created successfully",
+      id: insertedId
+    });
   });
 });
 
+
 //for new typescript dashboard
 DocumentRouter.post("/add_New", upload.single("image"), (req, res) => {
-  const { tenant_id, book_id, file_type, status, created_at } = req.body;
+  const { user_id, file_type, status, created_at } = req.body;
   const imageBuffer = req.file?.buffer;
 
-  const query = "INSERT INTO documents (tenant_id ,book_id   , file, file_type ,status ,created_at) VALUES (?,?,?,?,?,?)";
-  const values = [tenant_id, book_id, imageBuffer || null, , file_type, status, created_at];
+  const query = "INSERT INTO documents (user_id   , file, file_type ,status ,created_at) VALUES (?,?,?,?,?)";
+  const values = [user_id, imageBuffer || null, , file_type, status, created_at];
 
   mysqlconnection.query(query, values, (err, result) => {
     if (err) {

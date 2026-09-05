@@ -21,6 +21,233 @@ UserRouter.get('/all', (req, res) => {
   });
 });
 
+UserRouter.get('/alladmins', (req, res) => {
+  const id = req.params.id;
+  mysqlconnection.query('select id,full_name,email,password,phone,sex,region,district,address,role,status,token,created_at from users where role="admin" or "super_admin"', (error, rows, fields) => {
+    if (!error) {
+      res.json(rows);
+    } else {
+      console.log(error);
+    }
+  });
+});
+
+UserRouter.get("/alladmins/:id", (req, res) => {
+  const id = req.params.id;
+  const query = `
+    SELECT
+        id,
+        full_name,
+        email,
+        password,
+        phone,
+        sex,
+        region,
+        district,
+        address,
+        role,
+        status,
+        token,
+        created_at
+    FROM users
+    WHERE id = ?
+      AND role IN ('admin', 'super_admin');
+  `;
+  mysqlconnection.query(query, [id], (error, rows, fields) => {
+    if (!error) {
+      res.json(rows);
+    } else {
+      console.log(error);
+    }
+  });
+});
+
+UserRouter.get('/allvisitor', (req, res) => {
+  const id = req.params.id;
+  mysqlconnection.query('select id,full_name,email,password,phone,sex,region,district,address,role,status,token,created_at from users where role="visitor"', (error, rows, fields) => {
+    if (!error) {
+      res.json(rows);
+    } else {
+      console.log(error);
+    }
+  });
+});
+
+UserRouter.get("/allvisitor/:id", (req, res) => {
+  const id = req.params.id;
+  const query = `
+    SELECT
+        id,
+        full_name,
+        email,
+        password,
+        phone,
+        sex,
+        region,
+        district,
+        address,
+        role,
+        status,
+        token,
+        created_at
+    FROM users
+    WHERE id = ?
+      AND role="visitor";
+  `;
+  mysqlconnection.query(query, [id], (error, rows, fields) => {
+    if (!error) {
+      res.json(rows);
+    } else {
+      console.log(error);
+    }
+  });
+});
+
+
+UserRouter.get('/allowner', (req, res) => {
+  const query = `
+    SELECT 
+      u.id, 
+      u.full_name, 
+      u.email, 
+      u.phone, 
+      u.sex, 
+      u.region, 
+      u.district, 
+      u.address, 
+      u.role, 
+      u.status, 
+      u.created_at,
+      COUNT(p.id) AS total_properties
+    FROM users u
+    LEFT JOIN properties p ON u.id = p.owner_id
+    WHERE u.role = 'owner'
+    GROUP BY u.id
+  `;
+
+  mysqlconnection.query(query, (error, rows) => {
+    if (error) {
+      console.error(error);
+      return res.status(500).json({ message: "Database query failed", error });
+    }
+
+    res.json(rows);
+  });
+});
+
+UserRouter.get("/allowner/:id", (req, res) => {
+  const id = req.params.id;
+  const query = `
+    SELECT 
+      u.id, 
+      u.full_name, 
+      u.email, 
+      u.phone, 
+      u.sex, 
+      u.region, 
+      u.district, 
+      u.address, 
+      u.role, 
+      u.status, 
+      u.created_at,
+      COUNT(p.id) AS total_properties
+    FROM users u
+    LEFT JOIN properties p ON u.id = p.owner_id
+    WHERE u.id = ?
+      AND role="owner"
+    GROUP BY u.id
+  `;
+
+  mysqlconnection.query(query, [id], (error, rows, fields) => {
+    if (!error) {
+      res.json(rows);
+    } else {
+      console.log(error);
+    }
+  });
+});
+
+
+UserRouter.get('/alltenant', (req, res) => {
+  const query = `
+    SELECT 
+      u.id, 
+      u.full_name, 
+      u.email, 
+      u.phone, 
+      u.sex, 
+      u.region, 
+      u.district, 
+      u.address, 
+      u.role, 
+      u.status, 
+      u.created_at,
+      COUNT(DISTINCT CASE WHEN r.rentStatus = 'confirmed' THEN r.id END) AS active_rented_count,
+      COUNT(DISTINCT b.id) AS total_bookings,
+      COUNT(DISTINCT p.id) AS total_payments,
+      COUNT(DISTINCT c.id) AS total_complaints,
+      COUNT(DISTINCT comp.id) AS total_compliments
+    FROM users u
+    LEFT JOIN rented r ON u.id = r.tenant_id
+    LEFT JOIN bookings b ON u.id = b.tenant_id
+    LEFT JOIN payment p ON u.id = p.tenant_id
+    LEFT JOIN complaints c ON u.id = c.tenant_id
+    LEFT JOIN complaints comp ON u.id = comp.tenant_id
+    WHERE u.role = 'tenant'
+    GROUP BY u.id
+    ORDER BY u.created_at DESC
+  `;
+
+  mysqlconnection.query(query, (error, rows) => {
+    if (error) {
+      console.error(error);
+      return res.status(500).json({ message: "Database query failed", error });
+    }
+
+    res.json(rows);
+  });
+});
+
+UserRouter.get('/alltenant/:id', (req, res) => {
+  const id = req.params.id;
+  const query = `
+    SELECT 
+      u.id, 
+      u.full_name, 
+      u.email, 
+      u.phone, 
+      u.sex, 
+      u.region, 
+      u.district, 
+      u.address, 
+      u.role, 
+      u.status, 
+      u.created_at,
+      COUNT(DISTINCT CASE WHEN r.rentStatus = 'confirmed' THEN r.id END) AS active_rented_count,
+      COUNT(DISTINCT b.id) AS total_bookings,
+      COUNT(DISTINCT p.id) AS total_payments,
+      COUNT(DISTINCT c.id) AS total_complaint,
+      COUNT(DISTINCT comp.id) AS total_compliments
+    FROM users u
+    LEFT JOIN rented r ON u.id = r.tenant_id
+    LEFT JOIN bookings b ON u.id = b.tenant_id
+    LEFT JOIN payment p ON u.id = p.tenant_id
+    LEFT JOIN complaints c ON u.id = c.tenant_id
+    LEFT JOIN complaints comp ON u.id = comp.tenant_id
+    WHERE u.id = ? AND u.role = 'tenant'
+    GROUP BY u.id
+    ORDER BY u.created_at DESC
+  `;
+
+  mysqlconnection.query(query, [id], (error, rows) => {
+    if (error) {
+      console.error(error);
+      return res.status(500).json({ message: "Database query failed", error });
+    }
+
+    res.json(rows);
+  });
+});
 // for new dashoard
 UserRouter.get('/allNew', (req, res) => {
   const query = `
@@ -141,7 +368,7 @@ UserRouter.post('/add', upload.single("profile_image"), (req, res) => {
       }
       // Insert new user into MySQL database
       const query = 'insert into users(full_name,email,password,phone,sex,region,district,address,role,status,profile_image,created_at,token) values(?,?,?,?,?,?,?,?,?,?,?,?,?);';
-      mysqlconnection.query(query, [full_name, email, password, phone,  sex, region, district, address, role, status, imageBuffer, created_at, token], (error, result) => {
+      mysqlconnection.query(query, [full_name, email, password, phone, sex, region, district, address, role, status, imageBuffer, created_at, token], (error, result) => {
         if (error) {
           return res.status(500).json({ error: error.message });
         }
@@ -185,7 +412,7 @@ UserRouter.post('/add', upload.single("profile_image"), (req, res) => {
 
 UserRouter.put("/update/:id", upload.single("profile_image"), (req, res) => {
   const id = req.params.id;
-  const { full_name, email, password, phone, sex, region, district, address, role, status } = req.body;
+  const { full_name, email, phone, address, role, status } = req.body;
   const imageBuffer = req.file?.buffer;
 
   // ✅ SQL keeps old values when input is null or empty string
@@ -194,17 +421,13 @@ UserRouter.put("/update/:id", upload.single("profile_image"), (req, res) => {
     SET 
       full_name = COALESCE(NULLIF(?, ''), full_name),
       email = COALESCE(NULLIF(?, ''), email),
-      password = COALESCE(NULLIF(?, ''), password),
       phone = COALESCE(NULLIF(?, ''), phone),
-      sex=COALESCE(NULLIF(?, ''), sex),
-      region=COALESCE(NULLIF(?, ''), region),
-      district=COALESCE(NULLIF(?, ''), district),
       address = COALESCE(NULLIF(?, ''), address),
       role = COALESCE(NULLIF(?, ''), role),
       status = COALESCE(NULLIF(?, ''), status)
   `;
 
-  const values = [full_name, email, password, phone, sex, region, district, address, role, status];
+  const values = [full_name, email, phone, address, role, status];
 
   // ✅ Only update profile_image if provided
   if (imageBuffer) {
@@ -236,6 +459,48 @@ UserRouter.put("/update/:id", upload.single("profile_image"), (req, res) => {
     });
   });
 });
+
+UserRouter.put("/updateAdmin/:id", (req, res) => {
+  const id = req.params.id;
+  const { full_name, phone, role, status } = req.body;
+
+  // ✅ SQL keeps old values when input is null or empty string
+  let query = `
+    UPDATE users
+    SET 
+      full_name = COALESCE(NULLIF(?, ''), full_name),
+      phone = COALESCE(NULLIF(?, ''), phone ),
+      role= COALESCE(NULLIF(?, ''), role),
+      status = COALESCE(NULLIF(?, ''), status )
+  `;
+
+  const values = [full_name, phone, role, status];
+
+  query += ` WHERE id = ?`;
+  values.push(id);
+
+  mysqlconnection.query(query, values, (err, result) => {
+    if (err) {
+      console.error("❌ MySQL Error:", err);
+      return res.status(500).json({
+        error: "Database update failed",
+        details: err.message,
+      });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // ✅ Return success
+    res.status(200).json({
+      message: "User updated successfully",
+      id,
+      updatedFields: req.body,
+    });
+  });
+});
+
 
 
 UserRouter.put('/editphone/:id', (req, res) => {
@@ -308,6 +573,22 @@ UserRouter.put('/forgetpassword_phone/:id', (req, res) => {
     });
 });
 
+
+UserRouter.put('/forgetpassword_phoneAdmin/:id', (req, res) => {
+  const id = req.params.id;
+  const { password } = req.body;
+  console.log(req.body);
+  mysqlconnection.query('update users set  password= ? where id=?'
+    , [password, id], (error, rows, fields) => {
+      if (!error) {
+        res.json({ status: 'updated' });
+      } else {
+        console.log(error);
+      }
+    });
+});
+
+
 UserRouter.put('/updatetoken/:id', (req, res) => {
   const id = req.params.id;
   const { token } = req.body;
@@ -339,7 +620,7 @@ UserRouter.post('/login', (req, res) => {
   try {
     const { phone, password } = req.body;
 
-    mysqlconnection.query('SELECT id,full_name,email,password,phone,sex,region,district,address,role,status,token,created_at FROM users WHERE phone = ?', [phone], (error, rows) => {
+    mysqlconnection.query('SELECT id,full_name,email,password,phone,sex,region,district,address,role,status,token,created_at FROM users WHERE phone = ? OR email = ?', [phone,phone], (error, rows) => {
       if (error) {
         return res.status(500).json({ error: error.message });
       }

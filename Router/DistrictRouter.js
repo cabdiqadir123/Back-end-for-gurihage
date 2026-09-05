@@ -31,6 +31,32 @@ DistrictRouter.get('/all', (req, res) => {
     });
 });
 
+DistrictRouter.get('/all/:id', (req, res) => {
+    const id = req.params.id;
+    const query = `
+        SELECT 
+            d.id,
+            d.name AS district_name,
+            d.region_id,
+            d.status,
+            d.created_at,
+            r.name AS region_name
+        FROM districts d
+        JOIN regions r ON d.region_id = r.id
+        where d.id=?
+    `;
+
+    mysqlconnection.query(query,[id], (error, rows) => {
+        if (!error) {
+            res.json(rows);
+        } else {
+            console.log(error);
+            res.status(500).json({ error: "Database error" });
+        }
+    });
+});
+
+
 DistrictRouter.post('/add', (req, res) => {
     const {
         name,

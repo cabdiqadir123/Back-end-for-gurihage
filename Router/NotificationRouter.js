@@ -30,50 +30,83 @@ NotificationRouter.get('/all_dash', (req, res) => {
     });
 });
 
+
 NotificationRouter.post('/add', (req, res) => {
-  const { from_type, from_id, recipient_role, user_id, title, message, hasButton, hasBook_id, hasBook_started, created_at } = req.body;
+
+  const {
+    from_type,
+    from_id,
+    recipient_role,
+    user_id,
+    title,
+    message,
+    message_open,
+    type,
+    istenant,
+    created_at
+  } = req.body;
+
   console.log(req.body);
+
   mysqlconnection.query(
-    'insert into notifications(from_type,from_id,recipient_role,user_id,title,message,hasButton,hasBook_id,hasBook_started,created_at) values(?,?,?,?,?,?,?,?,?,?);',
-    [from_type, from_id, recipient_role, user_id, title, message, hasButton, hasBook_id, hasBook_started, created_at], (error, rows, fields) => {
-      if (!error) {
-        res.json({ status: 'inserted' });
-      } else {
+
+    `INSERT INTO notifications
+    (
+      from_type,
+      from_id,
+      recipient_role,
+      user_id,
+      title,
+      message,
+      message_open,
+      type,
+      istenant,
+      created_at
+    )
+
+    VALUES(?,?,?,?,?,?,?,?,?,?)`,
+
+    [
+      from_type,
+      from_id,
+      recipient_role,
+      user_id,
+      title,
+      message,
+      message_open,
+      type,
+      istenant,
+      created_at
+    ],
+
+    (error, rows) => {
+
+      if (error) {
+
         console.log(error);
+
+        return res.status(500).json({
+
+          success:false,
+
+          message:error.message
+
+        });
+
       }
-    });
-});
 
-NotificationRouter.post('/add_to_all', async (req, res) => {
-  const { from_type, from_id, recipient_role, title, message, hasButton, hasBook_id, hasBook_started, created_at } = req.body;
+      return res.json({
 
-  try {
-    // 1. Get all user IDs with the recipient_role
-    const [users] = await mysqlconnection.promise().query(
-      'SELECT id FROM users WHERE role = ?',
-      [recipient_role]
-    );
+        success:true,
 
-    if (users.length === 0) {
-      return res.json({ status: 'no users found for this role' });
+        status:"inserted"
+
+      });
+
     }
 
-    // 2. Insert a notification for each user
-    const insertPromises = users.map(user => {
-      return mysqlconnection.promise().query(
-        'INSERT INTO notifications(from_type, from_id, recipient_role, user_id, title, message, hasButton, hasBook_id, hasBook_started, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [from_type, from_id, recipient_role, user.id, title, message, hasButton, hasBook_id, hasBook_started, created_at]
-      );
-    });
+  );
 
-    await Promise.all(insertPromises);
-
-    res.json({ status: 'notifications inserted', count: users.length });
-
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ status: 'error', error });
-  }
 });
 
 
@@ -103,11 +136,11 @@ NotificationRouter.put('/update-message-open/:id', (req, res) => {
     });
 });
 
-NotificationRouter.put('/update-book_status/:id', (req, res) => {
+
+NotificationRouter.put('/update-message-openAdmin/:id', (req, res) => {
   const id = req.params.id;
-  const { hasBook_started } = req.body;
-  mysqlconnection.query('update notifications set hasBook_started=? where hasBook_id=?'
-    , [hasBook_started, id], (error, rows, fields) => {
+  mysqlconnection.query('update notifications set message_open="read" where from_id=?'
+    , [ id], (error, rows, fields) => {
       if (!error) {
         res.json({ status: 'updated' });
       } else {
@@ -115,6 +148,7 @@ NotificationRouter.put('/update-book_status/:id', (req, res) => {
       }
     });
 });
+
 
 NotificationRouter.post('/delete/:id', (req, res) => {
   const id = req.params.id;
@@ -128,6 +162,20 @@ NotificationRouter.post('/delete/:id', (req, res) => {
       }
     });
 });
+
+NotificationRouter.post('/deleteNew/:id', (req, res) => {
+  const id = req.params.id;
+  console.log(req.body);
+  mysqlconnection.query('delete from notifications where notification_id=?'
+    , [id], (error, rows, fields) => {
+      if (!error) {
+        res.json(rows);
+      } else {
+        res.json({ status: error });
+      }
+    });
+});
+
 
 NotificationRouter.post('/delete_all/:id', (req, res) => {
   const id = req.params.id;

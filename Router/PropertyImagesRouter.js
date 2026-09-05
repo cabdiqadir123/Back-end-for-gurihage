@@ -64,11 +64,11 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 PropertyImagesRouter.post("/add", upload.single("image"), (req, res) => {
-    const { unit_code,  created_at } = req.body;
+    const { pr_code,  created_at } = req.body;
     const imageBuffer = req.file.buffer;
-    const query = "INSERT INTO property_images ( unit_code,image ,created_at) VALUES (?,?,?)";
+    const query = "INSERT INTO property_images ( pr_code,image ,created_at) VALUES (?,?,?)";
 
-    mysqlconnection.query(query, [unit_code, imageBuffer, created_at], (err, result) => {
+    mysqlconnection.query(query, [pr_code, imageBuffer, created_at], (err, result) => {
         if (err) {
             return res.status(500).json({
                 message: "Error saving image to database",
@@ -81,16 +81,16 @@ PropertyImagesRouter.post("/add", upload.single("image"), (req, res) => {
 
 PropertyImagesRouter.put("/update/:id", upload.single("image"), (req, res) => {
     const id = req.params.id;
-    const {   unit_code } = req.body;
+    const {   pr_code } = req.body;
 
     const imageBuffer = req.file?.buffer;
 
     // Build dynamic SQL
     let query = `
     UPDATE property_images 
-    SET unit_code=?
+    SET pr_code=?
   `;
-    const values = [ unit_code];
+    const values = [ pr_code];
 
     // Only update image if a new one is uploaded
     if (imageBuffer) {
