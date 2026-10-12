@@ -254,27 +254,227 @@ PaymentRouter.get('/trend', (req, res) => {
   });
 });
 
-PaymentRouter.post('/add', (req, res) => {
-  const { tenant_id, rent_id, type, amount, method, created_at } = req.body;
-  console.log(req.body);
-  mysqlconnection.query(
-    'INSERT INTO payment (tenant_id, rent_id, type, amount, method, created_at) VALUES(?, ?, ?, ?, ?, ?);',
-    [tenant_id, rent_id, type, amount, method, created_at],
-    (error, rows, fields) => {
-      if (!error) {
-        const insertedId = rows.insertId;
 
-        res.status(200).json({
-          message: "payment created successfully",
-          payment_id: insertedId
-        });
-      } else {
-        console.log(error);
-        res.status(500).json({ error: 'Failed to add payment' });
-      }
+PaymentRouter.post('/add', (req, res) => {
+  const {
+    tenant_id,
+    rent_id,
+    type,
+    amount,
+    method,
+    created_at
+  } = req.body;
+
+  console.log('Payment request:', req.body);
+
+  if (!tenant_id || !rent_id || !amount) {
+    return res.status(400).json({
+      error: 'tenant_id, rent_id and amount are required'
+    });
+  }
+
+  // Get the rental information first.
+  const rentQuery = `
+    SELECT
+      id,
+      tenant_id,
+      move_in_date,
+      period,
+      lease,
+      rentStatus
+    FROM rented
+    WHERE id = ?
+    LIMIT 1
+  `;
+
+  mysqlconnection.query(rentQuery, [rent_id], (error, rentRows) => {
+    if (error) {
+      console.error('Error finding rented record:', error);
+
+      return res.status(500).json({
+        error: 'Failed to find rental',
+        details: error.message
+      });
     }
-  );
+
+    if (rentRows.length === 0) {
+      return res.status(404).json({
+        error: 'Rental record not found'
+      });
+    }
+
+    const rent = rentRows[0];
+
+    // Make sure the payment belongs to the same tenant.
+    if (Number(rent.tenant_id) !== Number(tenant_id)) {
+      return res.status(400).json({
+        error: 'This rental does not belong to this tenant'
+      });
+    }
+
+    /*
+     * Use the actual payment date only for created_at.
+     *
+     * The rent due date is calculated from move_in_date,
+     * NOT from the date the tenant pays.
+     */
+    const paymentDate = created_at
+      ? new Date(created_at)
+      : new Date();
+
+    if (Number.isNaN(paymentDate.getTime())) {
+      return res.status(400).json({
+        error: 'Invalid payment date'
+      });
+    }
+
+    /*
+     * We calculate the current rental month using MySQL.
+     *
+     * Example:
+     * move_in_date = 2026-08-20
+     *
+     * Current date = 2026-09-17
+     *
+     * Current rental cycle = 2026-08-20 -> 2026-09-20
+     *
+     * Therefore the next due date is 2026-09-20.
+     */
+    const cycleQuery = `
+      SELECT
+        DATE(
+          DATE_ADD(
+            r.move_in_date,
+            INTERVAL (
+              TIMESTAMPDIFF(
+                MONTH,
+                r.move_in_date,
+                CURDATE()
+              )
+              +
+              CASE
+                WHEN DAY(CURDATE()) >= DAY(r.move_in_date)
+                THEN 1
+                ELSE 0
+              END
+            ) MONTH
+          )
+        ) AS next_due_date
+      FROM rented r
+      WHERE r.id = ?
+      LIMIT 1
+    `;
+
+    mysqlconnection.query(cycleQuery, [rent_id], (cycleError, cycleRows) => {
+      if (cycleError) {
+        console.error('Error calculating rent cycle:', cycleError);
+
+        return res.status(500).json({
+          error: 'Failed to calculate rent cycle',
+          details: cycleError.message
+        });
+      }
+
+      if (cycleRows.length === 0) {
+        return res.status(404).json({
+          error: 'Unable to calculate rental cycle'
+        });
+      }
+
+      const nextDueDate = cycleRows[0].next_due_date;
+
+      /*
+       * Check whether this rental cycle has already been paid.
+       *
+       * rent_month is the date representing the rental month/cycle.
+       */
+      const duplicateQuery = `
+        SELECT id
+        FROM payment
+        WHERE rent_id = ?
+          AND type = 'rent'
+          AND rent_month = ?
+        LIMIT 1
+      `;
+
+      mysqlconnection.query(
+        duplicateQuery,
+        [rent_id, nextDueDate],
+        (duplicateError, duplicateRows) => {
+          if (duplicateError) {
+            console.error(
+              'Error checking existing rent payment:',
+              duplicateError
+            );
+
+            return res.status(500).json({
+              error: 'Failed to check existing rent payment',
+              details: duplicateError.message
+            });
+          }
+
+          if (duplicateRows.length > 0) {
+            return res.status(400).json({
+              error: 'This rental month has already been paid',
+              payment_id: duplicateRows[0].id,
+              rent_month: nextDueDate
+            });
+          }
+
+          const insertQuery = `
+            INSERT INTO payment
+            (
+              tenant_id,
+              rent_id,
+              type,
+              amount,
+              method,
+              status,
+              rent_month,
+              due_date,
+              created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `;
+
+          mysqlconnection.query(
+            insertQuery,
+            [
+              tenant_id,
+              rent_id,
+              type || 'rent',
+              amount,
+              method || null,
+              'Paid',
+              nextDueDate,
+              nextDueDate,
+              created_at || new Date()
+            ],
+            (insertError, result) => {
+              if (insertError) {
+                console.error('Error adding payment:', insertError);
+
+                return res.status(500).json({
+                  error: 'Failed to add payment',
+                  details: insertError.message
+                });
+              }
+
+              return res.status(200).json({
+                message: 'Payment created successfully',
+                payment_id: result.insertId,
+                rent_month: nextDueDate,
+                due_date: nextDueDate,
+                status: 'Paid'
+              });
+            }
+          );
+        }
+      );
+    });
+  });
 });
+
 
 PaymentRouter.put('/update/:id', (req, res) => {
   const id = req.params.id;

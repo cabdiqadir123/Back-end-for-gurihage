@@ -268,6 +268,54 @@ ComplaintRouter.get('/resolution-rate', (req, res) => {
 });
 
 
+ComplaintRouter.get('/resolution-rate-report', (req, res) => {
+  const query = `
+    SELECT 
+      status AS name,
+      COUNT(id) AS count
+    FROM complaints
+    GROUP BY status
+  `;
+
+  mysqlconnection.query(query, (error, rows) => {
+    if (error) {
+      console.error(error);
+      return res.status(500).json({
+        message: "Database query failed",
+        error
+      });
+    }
+
+    const total = rows.reduce(
+      (acc, row) => acc + Number(row.count),
+      0
+    );
+
+    const colors = {
+      'Resolved': '#19B65B',
+      'In Progress': '#FFA500',
+      'Pending': '#FF0000'
+    };
+
+    const formattedData = rows.map(row => ({
+      name: row.name,
+      count: Number(row.count),
+      value: total > 0
+        ? Math.round((Number(row.count) / total) * 100)
+        : 0,
+      color: colors[row.name] || '#8884d8'
+    }));
+
+    res.json({
+      total,
+      resolved: rows.find(r => r.name === 'Resolved')
+        ? Number(rows.find(r => r.name === 'Resolved').count)
+        : 0,
+      data: formattedData
+    });
+  });
+});
+
 // 1. INSERT ROUTE
 ComplaintRouter.post('/add', (req, res) => {
   const { 

@@ -1,9 +1,9 @@
 const express = require("express");
-const Router = express.Router();
+const TechnicianRouter = express.Router();
 const mysqlconnection = require("../dstsbase/database");
 
 // Get all technicians
-Router.get("/all", (req, res) => {
+TechnicianRouter.get("/all", (req, res) => {
   mysqlconnection.query(
     "SELECT * FROM technician ORDER BY created_at DESC",
     (err, rows) => {
@@ -15,7 +15,7 @@ Router.get("/all", (req, res) => {
 });
 
 // Get technician by id
-Router.get("/:id", (req, res) => {
+TechnicianRouter.get("/:id", (req, res) => {
   mysqlconnection.query(
     "SELECT * FROM technician WHERE id=?",
     [req.params.id],
@@ -27,8 +27,38 @@ Router.get("/:id", (req, res) => {
   );
 });
 
+TechnicianRouter.get('/performance', (req, res) => {
+  const query = `
+    SELECT  
+      technician AS name,
+      COUNT(id) AS total_assigned,
+      SUM(
+        CASE 
+          WHEN status = 'Resolved' THEN 1 
+          ELSE 0 
+        END
+      ) AS completed
+    FROM complaints
+    WHERE technician IS NOT NULL 
+      AND technician != ''
+    GROUP BY technician
+  `;
+
+  mysqlconnection.query(query, (error, rows) => {
+    if (error) {
+      console.error(error);
+      return res.status(500).json({
+        message: "Database query failed",
+        error
+      });
+    }
+
+    res.json(rows);
+  });
+});
+
 // Add technician
-Router.post("/add", (req, res) => {
+TechnicianRouter.post("/add", (req, res) => {
   const {
     full_name,
     email,
@@ -62,7 +92,7 @@ Router.post("/add", (req, res) => {
 });
 
 // Update technician
-Router.put("/update/:id", (req, res) => {
+TechnicianRouter.put("/update/:id", (req, res) => {
   const {
     full_name,
     email,
@@ -102,7 +132,7 @@ Router.put("/update/:id", (req, res) => {
 });
 
 // Delete technician
-Router.delete("/delete/:id", (req, res) => {
+TechnicianRouter.delete("/delete/:id", (req, res) => {
   mysqlconnection.query(
     "DELETE FROM technician WHERE id=?",
     [req.params.id],
@@ -116,4 +146,4 @@ Router.delete("/delete/:id", (req, res) => {
   );
 });
 
-module.exports = Router;
+module.exports = TechnicianRouter;

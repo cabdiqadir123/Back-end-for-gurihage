@@ -352,6 +352,34 @@ PropertyRouter.get("/ownerall/:id", (req, res) => {
     });
 });
 
+PropertyRouter.get('/top', (req, res) => {
+  const query = `
+    SELECT 
+        p.id,
+        p.name AS name,
+        p.property_type AS type,
+        p.address AS location,
+        COUNT(b.id) AS total_bookings,
+        'Active' AS status,
+        '#19B65B' AS color,
+        '$0' AS revenue,
+        '0%' AS occupancy,
+        5 AS rating
+        FROM properties p
+        LEFT JOIN bookings b ON p.id = b.property_id
+        GROUP BY p.id, p.name, p.property_type, p.address
+        LIMIT 5
+  `;
+
+  mysqlconnection.query(query, (error, rows) => {
+    if (error) {
+      console.error(error);
+      return res.status(500).json({ message: "Database query failed", error });
+    }
+    res.json(rows);
+  });
+});
+
 // GET IMAGE
 PropertyRouter.get("/image/:id", (req, res) => {
     const imageId = req.params.id;

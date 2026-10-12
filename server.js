@@ -85,7 +85,7 @@ function isSomaliaActiveTime() {
 
 //   try {
 //     const res = await fetch(APP_URL + MAIN_ROUTE);
-//     console.log(`Pinged ${MAIN_ROUTE} â†’ Status: ${res.status}`);
+//     console.log(`Pinged ${MAIN_ROUTE} Ã¢â€ â€™ Status: ${res.status}`);
 //   } catch (err) {
 //     console.error(`Ping failed:`, err.message);
 //   }
@@ -118,12 +118,12 @@ global.activeChats = activeChats;
 // ------------------- SOCKET EVENTS -------------------
 
 io.on("connection", (socket) => {
-  console.log("ðŸŸ¢ User connected:", socket.id);
+  console.log("Ã°Å¸Å¸Â¢ User connected:", socket.id);
 
   // REGISTER USER
   socket.on("join", (user_id) => {
     onlineUsers.set(user_id, socket.id);
-    console.log(`ðŸ‘¤ User ${user_id} registered with socket ${socket.id}`);
+    console.log(`Ã°Å¸â€˜Â¤ User ${user_id} registered with socket ${socket.id}`);
   });
 
   socket.on("open_chat", (data) => {
@@ -183,7 +183,7 @@ AND receiver_status='unread'
   });
 
   // ----------------------------------------------------
-  // ðŸ”¥ CHAT SYSTEM
+  // Ã°Å¸â€Â¥ CHAT SYSTEM
   // ----------------------------------------------------
   // ?? CHAT SYSTEM
   // ----------------------------------------------------
@@ -288,10 +288,10 @@ AND receiver_status='unread'
   });
 
   // ----------------------------------------------------
-  // ðŸ”¥ CALL SYSTEM (AGORA)
+  // Ã°Å¸â€Â¥ CALL SYSTEM (AGORA)
   // ----------------------------------------------------
 
-  // Client â†’ Worker call request
+  // Client Ã¢â€ â€™ Worker call request
   socket.on("call_user", (data) => {
     console.log("CALLING:", data.receiverId);
 
@@ -311,7 +311,7 @@ AND receiver_status='unread'
     }
   });
 
-  // Receiver â†’ accepts
+  // Receiver Ã¢â€ â€™ accepts
   socket.on("call_accepted", (data) => {
     const callerSocket = global.onlineUsers.get(data.callerId);
 
@@ -326,7 +326,7 @@ AND receiver_status='unread'
     }
   });
 
-  // Receiver â†’ rejects
+  // Receiver Ã¢â€ â€™ rejects
   socket.on("call_rejected", (data) => {
     const callerSocket = global.onlineUsers.get(data.callerId);
 
@@ -360,5 +360,5 @@ server.listen(app.get("port"), '0.0.0.0', () => {
 });
 
 // server.listen(app.get("port"), () => {
-//   console.log(`ðŸš€ Server running with Socket.IO on port ${app.get("port")}`);
+//   console.log(`Ã°Å¸Å¡â‚¬ Server running with Socket.IO on port ${app.get("port")}`);
 // });

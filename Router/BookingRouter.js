@@ -425,6 +425,59 @@ BookingRouter.get('/volume', (req, res) => {
   });
 });
 
+BookingRouter.get('/volume-report', (req, res) => {
+  const query = `
+    SELECT
+      p.property_type AS type,
+      COUNT(b.id) AS value
+    FROM bookings b
+    INNER JOIN properties p
+      ON b.property_id = p.id
+    GROUP BY p.property_type
+    ORDER BY value DESC
+  `;
+
+  mysqlconnection.query(query, (error, rows) => {
+    if (error) {
+      console.error("Booking volume report error:", error);
+
+      return res.status(500).json({
+        message: "Database query failed",
+        error: error.message
+      });
+    }
+
+    const colors = {
+      apartment: '#19B65B',
+      villa: '#FFA500',
+      home: '#3B82F6',
+      floor: '#8B5CF6'
+    };
+
+    const totalBookings = rows.reduce(
+      (sum, row) => sum + Number(row.value || 0),
+      0
+    );
+
+    const formattedData = rows.map(row => {
+      const type = row.type || 'Unknown';
+      const count = Number(row.value || 0);
+
+      return {
+        type,
+        value: totalBookings > 0
+          ? Math.round((count / totalBookings) * 100)
+          : 0,
+        count,
+        color:
+          colors[String(type).toLowerCase()] || '#8884d8'
+      };
+    });
+
+    res.json(formattedData);
+  });
+});
+
 BookingRouter.post('/add', (req, res) => {
   let {
     tenant_id,
